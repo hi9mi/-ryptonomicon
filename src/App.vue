@@ -1,7 +1,7 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
     <div
-      v-if="!availableTickersList.length"
+      v-if="!availableTickers.length"
       class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
     >
       <svg
@@ -50,11 +50,11 @@
             >
               <span
                 v-for="suggestion of suggestions"
-                :key="suggestion.Id"
-                @click="selectSuggestion(suggestion.Symbol)"
+                :key="suggestion"
+                @click="selectSuggestion(suggestion)"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
-                {{ suggestion.Symbol }}
+                {{ suggestion }}
               </span>
             </div>
             <div v-if="error" class="text-sm text-red-600">
@@ -107,7 +107,10 @@
             v-for="t in paginatedTickers"
             :key="t.name"
             @click="selectTicker(t)"
-            :class="{ 'border-4': selectedTicker === t }"
+            :class="{
+              'border-4': selectedTicker === t,
+              'bg-red-100': !t.valid,
+            }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
           >
             <div class="px-4 py-5 sm:p-6 text-center">
@@ -187,7 +190,11 @@
 </template>
 
 <script>
-import { subscribeToTicker, unsubscribeFromTicker } from './api';
+import {
+  subscribeToTicker,
+  unsubscribeFromTicker,
+  getTickersList,
+} from './api';
 
 export default {
   name: 'App',
@@ -197,14 +204,16 @@ export default {
       tickers: [],
       selectedTicker: null,
       graph: [],
-      availableTickersList: [],
+      availableTickers: [],
       error: false,
       suggestions: [],
       page: 1,
       filter: '',
     };
   },
-  created() {
+  async created() {
+    this.availableTickers = await getTickersList();
+
     const windowData = Object.fromEntries(
       new URL(window.location).searchParams.entries()
     );
@@ -222,22 +231,11 @@ export default {
     if (tickersData) {
       this.tickers = JSON.parse(tickersData);
       this.tickers.forEach((ticker) => {
-        subscribeToTicker(ticker.name, (newPrice) => {
-          this.updateTicker(ticker.name, newPrice);
+        subscribeToTicker(ticker.name, (newPrice, invalid) => {
+          this.updateTicker(ticker.name, newPrice, invalid);
         });
       });
     }
-    setInterval(this.updateTickers, 5000);
-  },
-
-  mounted() {
-    fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true')
-      .then((response) => response.json())
-      .then((availableTickers) => {
-        this.availableTickersList = Object.keys(availableTickers.Data).map(
-          (tickerKey) => availableTickers.Data[tickerKey]
-        );
-      });
   },
 
   computed: {
@@ -286,25 +284,24 @@ export default {
   },
 
   methods: {
-    updateTicker(tickerName, price) {
-      this.tickers
-        .filter((t) => t.name === tickerName)
-        .forEach((t) => {
-          t.price = price;
-        });
+    updateTicker(tickerName, price, invalid) {
+      const ticker = this.tickers.find((t) => t.name === tickerName);
+      if (invalid) {
+        ticker.valid = false;
+        return;
+      }
+
+      if (ticker === this.selectedTicker) {
+        this.graph.push(price);
+      }
+      ticker.price = price;
     },
     handleChangeTicker(event) {
       this.ticker = event.target.value;
       this.error = false;
-      this.suggestions = this.availableTickersList
-        .filter(
-          (availableTicker) =>
-            availableTicker.FullName.toLowerCase().includes(
-              this.ticker.toLowerCase()
-            ) ||
-            availableTicker.Symbol.toLowerCase().includes(
-              this.ticker.toLowerCase()
-            )
+      this.suggestions = this.availableTickers
+        .filter((availableTicker) =>
+          availableTicker.toLowerCase().includes(this.ticker.toLowerCase())
         )
         .slice(0, 4);
     },
@@ -318,6 +315,7 @@ export default {
       const currentTicker = {
         name: this.ticker,
         price: '-',
+        valid: true,
       };
 
       const isAddedTicker = this.tickers.find(
@@ -334,8 +332,8 @@ export default {
       this.filter = '';
       this.suggestions = [];
 
-      subscribeToTicker(currentTicker.name, (newPrice) => {
-        this.updateTicker(currentTicker.name, newPrice);
+      subscribeToTicker(currentTicker.name, (newPrice, invalid) => {
+        this.updateTicker(currentTicker.name, newPrice, invalid);
       });
     },
     deleteTicker(tickerToDelete) {
