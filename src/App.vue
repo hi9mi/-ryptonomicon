@@ -149,7 +149,10 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.name }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div
+          ref="graph"
+          class="flex items-end border-gray-600 border-b border-l h-64"
+        >
           <div
             v-for="(bar, idx) in normalizedGraph"
             :key="idx"
@@ -209,6 +212,7 @@ export default {
       suggestions: [],
       page: 1,
       filter: '',
+      maxGraphElements: 3,
     };
   },
   async created() {
@@ -236,6 +240,14 @@ export default {
         });
       });
     }
+  },
+
+  mounted() {
+    window.addEventListener('resize', this.calculateMaxGraphElements);
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('resize', this.calculateMaxGraphElements);
   },
 
   computed: {
@@ -284,6 +296,14 @@ export default {
   },
 
   methods: {
+    calculateMaxGraphElements() {
+      if (!this.$refs.graph) {
+        return;
+      }
+
+      this.maxGraphElements = Math.floor(this.$refs.graph.clientWidth / 38);
+    },
+
     updateTicker(tickerName, price, invalid) {
       const ticker = this.tickers.find((t) => t.name === tickerName);
       if (invalid) {
@@ -292,7 +312,12 @@ export default {
       }
 
       if (ticker === this.selectedTicker) {
+        console.log(this.maxGraphElements);
         this.graph.push(price);
+
+        while (this.graph.length > this.maxGraphElements) {
+          this.graph.shift();
+        }
       }
       ticker.price = price;
     },
@@ -355,6 +380,7 @@ export default {
   watch: {
     selectedTicker() {
       this.graph = [];
+      this.$nextTick().then(this.calculateMaxGraphElements);
     },
     tickers() {
       localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
