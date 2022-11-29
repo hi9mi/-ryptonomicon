@@ -18,7 +18,7 @@
     </div>
     <div class="w-full border-t border-gray-200"></div>
     <button
-      @click.stop="$emit('delete-ticker', ticker)"
+      @click.stop="(isOpenPopup = true), (confirmation = '')"
       class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
     >
       <svg
@@ -35,11 +35,50 @@
         ></path></svg
       >Удалить
     </button>
+    <ticker-popup
+      @ok="confirmPopup"
+      @close="isOpenPopup = false"
+      :isOpen="isOpenPopup"
+    >
+      <template #header>
+        <h2 class="mb-7">Внимание!</h2>
+      </template>
+      <template #body>
+        <p class="mb-7">
+          Для того чтобы удалять тикер нужно ввести его имя -
+          <strong>{{ ticker.name }}</strong>
+        </p>
+      </template>
+      <template #actions="{ confirm, close }">
+        <input type="text" v-model="confirmation" :placeholder="ticker.name" />
+        <div>
+          <button
+            @click="close"
+            class="inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            Отменить
+          </button>
+          <button
+            @click="confirm"
+            :disabled="!isConfirmationCorrect"
+            class="inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:bg-gray-300"
+          >
+            Подтвердить
+          </button>
+        </div>
+      </template>
+    </ticker-popup>
   </div>
 </template>
 
 <script>
+import TickerPopup from './ticker-popup.vue';
+
 export default {
+  components: {
+    TickerPopup,
+  },
+
   props: {
     ticker: {
       type: Object,
@@ -56,11 +95,29 @@ export default {
     'select-ticker': (ticker) => typeof ticker === 'object',
   },
 
+  data() {
+    return {
+      confirmation: '',
+      isOpenPopup: false,
+    };
+  },
+
+  computed: {
+    isConfirmationCorrect() {
+      return this.confirmation === this.ticker.name;
+    },
+  },
+
   methods: {
     formatPrice(price) {
       price = price ?? '-';
       if (price === '-') return price;
       return price > 1 ? price.toFixed(2) : price.toPrecision(2);
+    },
+
+    confirmPopup() {
+      this.closePopup = false;
+      this.$emit('delete-ticker', this.ticker);
     },
   },
 };

@@ -194,7 +194,7 @@ export default {
     },
 
     selectTicker(ticker) {
-      if (!ticker.valid) {
+      if (!ticker.valid || !Number(ticker.price)) {
         return;
       }
       this.selectedTicker = ticker;

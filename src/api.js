@@ -1,11 +1,7 @@
-// todo: remove constants and use URL and URLSearchParams
 const API_KEY =
   '36a80c87ff12cd1db75487c55ae74d75e96cf0a715b6133e8252439cb1155266';
 const tickersHandlers = new Map();
 let tickersList = [];
-// const params = new URLSearchParams({
-//   api_key: API_KEY
-// })
 
 const bc = new BroadcastChannel('general');
 const socket = new WebSocket(
@@ -39,7 +35,6 @@ socket.addEventListener('message', (e) => {
   }
 
   if (type === TOO_MANY_SOCKETS_PER_CLIENT) {
-    console.log(fromCurrency);
     bc.addEventListener('message', (e) => {
       const { ticker, newPrice, invalid } = JSON.parse(e.data);
       updateTicker(ticker, newPrice * ratioBTC, invalid);
